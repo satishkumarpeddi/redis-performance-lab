@@ -1,0 +1,778 @@
+# Phase 1 — Redis Single-Node Baseline
+
+## Redis Performance, Scaling & Failure Experiments
+
+**Phase:** 1 — Single-Node Baseline
+**Experiment:** Baseline #001
+**Status:** ✅ Complete
+**Date:** 21 September 2026
+**Redis Version:** 8.0.5
+**Node:** `cluster-master`
+
+---
+
+## 1. Overview
+
+This phase establishes the **single-node performance baseline** for the Redis Performance, Scaling & Failure Experiments project.
+
+The purpose of this experiment is to measure Redis performance on one physical machine before introducing:
+
+* Kubernetes/K3s
+* Multiple Redis instances
+* Replication
+* Persistence changes
+* Increased client concurrency
+* Different payload sizes
+* Pipelining
+* Node failures
+* Network failures
+* Scaling experiments
+
+The baseline provides a reference point against which future experiments can be compared.
+
+> **Experimental principle:** establish a controlled baseline first, then change one major variable at a time.
+
+---
+
+# 2. Project Objective
+
+The long-term objective of this project is to investigate how Redis behaves under different:
+
+* Workloads
+* Concurrency levels
+* Payload sizes
+* Pipeline depths
+* Keyspace sizes
+* Persistence configurations
+* Replication configurations
+* Kubernetes deployments
+* Node failures
+* Network failures
+
+The overall research progression is:
+
+```text
+Single Redis Instance
+        │
+        ▼
+Single-Node Baseline
+        │
+        ▼
+Concurrency Experiments
+        │
+        ▼
+Payload Experiments
+        │
+        ▼
+Pipelining
+        │
+        ▼
+K3s Deployment
+        │
+        ▼
+Multi-Node Scaling
+        │
+        ├── Persistence
+        ├── Replication
+        └── Failure Testing
+                │
+                ▼
+        Statistical Analysis
+                │
+                ▼
+        Final Report
+```
+
+---
+
+# 3. Experimental Environment
+
+## 3.1 Node
+
+```text
+Hostname: cluster-master
+```
+
+Hardware:
+
+```text
+Vendor: Lenovo
+Model: Lenovo IdeaPad S145-15AST
+```
+
+Operating system:
+
+```text
+Ubuntu 26.04.1 LTS
+```
+
+Kernel:
+
+```text
+Linux 7.0.0-31-generic
+```
+
+Architecture:
+
+```text
+x86_64
+```
+
+---
+
+# 4. CPU
+
+```text
+CPU: AMD A9-9425 RADEON R5
+Cores: 2
+Threads per core: 1
+Socket: 1
+Maximum frequency: 3.1 GHz
+```
+
+CPU summary:
+
+| Property       | Value       |
+| -------------- | ----------- |
+| Architecture   | x86_64      |
+| Vendor         | AMD         |
+| Processor      | AMD A9-9425 |
+| Physical cores | 2           |
+| Threads/core   | 1           |
+| Max frequency  | 3.1 GHz     |
+
+---
+
+# 5. Memory
+
+System memory:
+
+```text
+Total RAM: 6.2 GiB
+Available RAM: 4.2 GiB
+```
+
+Swap:
+
+```text
+Total Swap: 3.2 GiB
+Used Swap: 924 KiB
+```
+
+Redis reported:
+
+```text
+total_system_memory: 6.16 GiB
+```
+
+---
+
+# 6. Storage
+
+Primary disk:
+
+```text
+/dev/sda
+Capacity: 931.5 GB
+```
+
+Relevant partitions:
+
+```text
+/dev/sda1    1 GB
+/dev/sda2    2 GB
+/dev/sda3    558.8 GB    /
+/dev/sda4    366.3 GB
+/dev/sda5    3.4 GB
+```
+
+---
+
+# 7. Redis Installation
+
+Redis server:
+
+```text
+Redis server v=8.0.5
+```
+
+Redis CLI:
+
+```text
+redis-cli 8.0.5
+```
+
+Verify the server:
+
+```bash
+redis-cli ping
+```
+
+Expected:
+
+```text
+PONG
+```
+
+Observed:
+
+```text
+PONG
+```
+
+This confirms that Redis was operational before benchmarking.
+
+---
+
+# 8. Redis Architecture
+
+Baseline #001 uses a standalone Redis instance.
+
+```text
+┌──────────────────────────────────────────┐
+│              cluster-master              │
+│                                          │
+│          Ubuntu 26.04.1 LTS              │
+│                                          │
+│          AMD A9-9425 / 2 cores           │
+│                                          │
+│              ┌──────────────┐            │
+│              │  Redis 8.0.5 │            │
+│              │    Master    │            │
+│              └───────┬──────┘            │
+│                      │                   │
+│                  No replicas              │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+Replication state:
+
+```text
+role:master
+connected_slaves:0
+```
+
+Therefore:
+
+```text
+Redis instances: 1
+Replicas: 0
+```
+
+---
+
+# 9. Redis Memory Baseline
+
+The following Redis memory information was captured:
+
+```text
+used_memory:             984008 bytes
+used_memory_human:       960.95K
+
+used_memory_rss:         16084992 bytes
+used_memory_rss_human:   15.34M
+
+used_memory_peak:        1110720 bytes
+used_memory_peak_human:  1.06M
+
+used_memory_dataset:     243288 bytes
+```
+
+Redis configuration:
+
+```text
+maxmemory: 0
+maxmemory_policy: noeviction
+```
+
+## Interpretation
+
+`maxmemory: 0` means that Redis has no explicit memory limit configured.
+
+The eviction policy is:
+
+```text
+noeviction
+```
+
+Therefore, this baseline does not represent a memory-constrained Redis deployment.
+
+---
+
+# 10. Memory Fragmentation
+
+Redis reported:
+
+```text
+mem_fragmentation_ratio: 16.65
+```
+
+This value should **not** be interpreted as a serious fragmentation problem for this experiment.
+
+The Redis dataset was extremely small:
+
+```text
+Dataset ≈ 243 KB
+```
+
+while process RSS was approximately:
+
+```text
+15.34 MB
+```
+
+At very small memory allocations, fixed process and allocator overhead can make the fragmentation ratio appear disproportionately large.
+
+This metric will be revisited when the experimental dataset becomes significantly larger.
+
+---
+
+# 11. Persistence Configuration
+
+Redis persistence information:
+
+```text
+rdb_saves: 1
+rdb_last_bgsave_status: ok
+```
+
+AOF status:
+
+```text
+aof_enabled: 0
+```
+
+Therefore:
+
+```text
+AOF: Disabled
+```
+
+Persistence is intentionally not being varied during this baseline.
+
+Persistence will be investigated later using:
+
+```text
+No persistence
+      │
+      ├── RDB
+      │
+      └── AOF
+```
+
+The future experiments will measure:
+
+* Throughput
+* Latency
+* CPU overhead
+* Disk I/O
+* Recovery time
+* Data durability
+
+---
+
+# 12. Replication Configuration
+
+Baseline replication state:
+
+```text
+role:master
+connected_slaves:0
+```
+
+Architecture:
+
+```text
+Client
+  │
+  ▼
+Redis Master
+  │
+  └── 0 Replicas
+```
+
+Replication will be introduced in a later phase.
+
+Planned configurations:
+
+```text
+1 Redis instance
+       │
+       ▼
+Primary + 1 Replica
+       │
+       ▼
+Primary + 2 Replicas
+```
+
+---
+
+# 13. Benchmark Methodology
+
+The first benchmark uses Redis's built-in:
+
+```text
+redis-benchmark
+```
+
+Command:
+
+```bash
+redis-benchmark -t set,get -n 100000 -q
+```
+
+Parameters:
+
+| Parameter       | Value             |
+| --------------- | ----------------- |
+| Benchmark tool  | `redis-benchmark` |
+| Operations      | SET, GET          |
+| Total requests  | 100,000           |
+| Output mode     | Quiet             |
+| Redis instances | 1                 |
+| Replicas        | 0                 |
+
+---
+
+# 14. Baseline Results
+
+## SET
+
+```text
+Throughput: 13,224.02 requests/sec
+p50 latency: 3.703 ms
+```
+
+## GET
+
+```text
+Throughput: 13,022.53 requests/sec
+p50 latency: 3.639 ms
+```
+
+### Summary
+
+| Operation | Requests |      Throughput | p50 Latency |
+| --------- | -------: | --------------: | ----------: |
+| SET       |  100,000 | 13,224.02 req/s |    3.703 ms |
+| GET       |  100,000 | 13,022.53 req/s |    3.639 ms |
+
+---
+
+# 15. Baseline Architecture
+
+```text
+                    ┌─────────────────────┐
+                    │    cluster-master   │
+                    │                     │
+                    │ Ubuntu 26.04.1      │
+                    │ AMD A9-9425         │
+                    │ 2 CPU cores         │
+                    │ 6.16 GiB RAM        │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │      Redis 8.0.5    │
+                    │                     │
+                    │       Master        │
+                    │                     │
+                    │    0 Replicas       │
+                    │    AOF Disabled     │
+                    └──────────┬──────────┘
+                               │
+                         redis-benchmark
+                               │
+                   ┌───────────┴───────────┐
+                   ▼                       ▼
+                 SET                     GET
+             13,224 req/s            13,023 req/s
+              p50 3.703 ms            p50 3.639 ms
+```
+
+---
+
+# 16. What Baseline #001 Tells Us
+
+The experiment establishes the first reference measurements for Redis on `cluster-master`.
+
+Observed:
+
+```text
+SET ≈ 13.2K operations/sec
+GET ≈ 13.0K operations/sec
+```
+
+Median latency:
+
+```text
+SET ≈ 3.70 ms
+GET ≈ 3.64 ms
+```
+
+These measurements are **baseline observations**, not a claim about the maximum performance of Redis or the hardware.
+
+The benchmark was performed under one workload configuration, and additional variables have not yet been explored.
+
+---
+
+# 17. Controlled Variables
+
+For future experiments, the following should remain unchanged unless specifically being studied:
+
+```text
+Redis version
+Operating system
+Kernel
+Hardware
+Benchmark methodology
+Dataset/workload
+Request count
+```
+
+For example, during the concurrency experiment:
+
+```text
+Hardware       SAME
+Redis version  SAME
+Payload        SAME
+Keyspace       SAME
+Persistence    SAME
+Replication    SAME
+
+Clients:
+1 → 10 → 50 → 100 → 250 → 500
+```
+
+This allows us to attribute observed changes primarily to client concurrency.
+
+---
+
+# 18. Current Limitations
+
+Baseline #001 is intentionally simple.
+
+It currently measures:
+
+```text
+SET
+GET
+Throughput
+p50 latency
+```
+
+It does not yet provide:
+
+```text
+p95 latency
+p99 latency
+CPU utilization
+Network throughput
+Disk I/O
+Multiple repetitions
+Statistical confidence intervals
+Different payload sizes
+Different keyspaces
+Pipelining
+Remote clients
+Replication
+Failure recovery
+```
+
+These will be introduced in later experiments.
+
+---
+
+# 19. Reproducibility
+
+The baseline can be reproduced with:
+
+```bash
+redis-benchmark -t set,get -n 100000 -q
+```
+
+Environment:
+
+```text
+Node: cluster-master
+OS: Ubuntu 26.04.1 LTS
+Kernel: 7.0.0-31-generic
+CPU: AMD A9-9425
+CPU cores: 2
+RAM: 6.16 GiB
+Redis: 8.0.5
+Replicas: 0
+AOF: Disabled
+```
+
+---
+
+# 20. Recommended Experiment Structure
+
+The project uses the following structure:
+
+```text
+redis-performance-lab/
+│
+├── README.md
+│
+├── docs/
+│   ├── redis-fundamentals.md
+│   ├── architecture.md
+│   └── methodology.md
+│
+├── experiments/
+│   ├── baseline/
+│   │   └── 001-single-node-default/
+│   │       ├── experiment.yaml
+│   │       ├── system-info.txt
+│   │       ├── redis-info.txt
+│   │       ├── results.csv
+│   │       └── notes.md
+│   │
+│   ├── node-comparison/
+│   ├── concurrency/
+│   ├── payload/
+│   ├── pipelining/
+│   ├── scaling/
+│   ├── persistence/
+│   ├── replication/
+│   ├── failures/
+│   └── analysis/
+│
+├── results/
+│   ├── raw/
+│   └── processed/
+│
+├── graphs/
+│
+└── scripts/
+    ├── benchmark.sh
+    ├── collect-system-info.sh
+    └── collect-redis-info.sh
+```
+
+---
+
+# 21. Baseline Data
+
+The currently observed baseline can be represented as:
+
+```csv
+experiment,operation,requests,throughput_req_sec,p50_ms
+001,SET,100000,13224.02,3.703
+001,GET,100000,13022.53,3.639
+```
+
+---
+
+# 22. Phase 1 Checklist
+
+| Requirement                  | Status |
+| ---------------------------- | ------ |
+| Identify test node           | ✅      |
+| Record OS                    | ✅      |
+| Record kernel                | ✅      |
+| Record CPU                   | ✅      |
+| Record RAM                   | ✅      |
+| Record storage               | ✅      |
+| Verify Redis installation    | ✅      |
+| Verify Redis connectivity    | ✅      |
+| Record Redis memory          | ✅      |
+| Record persistence           | ✅      |
+| Record replication           | ✅      |
+| Run SET benchmark            | ✅      |
+| Run GET benchmark            | ✅      |
+| Record throughput            | ✅      |
+| Record p50 latency           | ✅      |
+| Document methodology         | ✅      |
+| Document limitations         | ✅      |
+| Establish reference baseline | ✅      |
+| p95/p99                      | ⏳      |
+| CPU monitoring               | ⏳      |
+| Automated data collection    | ⏳      |
+| Repeated statistical runs    | ⏳      |
+
+---
+
+# 23. Phase 1 Conclusion
+
+Baseline #001 establishes the initial single-node Redis performance reference on the `cluster-master` machine.
+
+### Reference result
+
+```text
+Redis 8.0.5
+AMD A9-9425
+2 CPU cores
+6.16 GiB RAM
+0 replicas
+AOF disabled
+
+SET → 13,224.02 req/s
+       p50 = 3.703 ms
+
+GET → 13,022.53 req/s
+       p50 = 3.639 ms
+```
+
+This baseline will serve as the reference point for subsequent experiments.
+
+The next phase will investigate how Redis performance changes as **client concurrency increases**, while keeping the remaining experimental variables controlled.
+
+---
+
+## Next Phase
+
+### Phase 2 — Concurrency Scaling
+
+Planned client levels:
+
+```text
+1
+10
+50
+100
+250
+500
+```
+
+For each level we will collect:
+
+```text
+Throughput
+p50 latency
+p95 latency
+p99 latency
+CPU utilization
+Memory utilization
+```
+
+Each configuration should be repeated multiple times so that we can calculate:
+
+```text
+Mean
+Median
+Standard deviation
+Min
+Max
+Coefficient of variation
+```
+
+The resulting data will allow us to construct the first real performance curve of the project:
+
+```text
+              Redis Throughput
+                     │
+                     │
+                     │       ______
+                     │     /
+                     │   /
+                     │ /
+                     └──────────────────►
+                         Concurrent Clients
+```
+
+The shape of that curve will be **measured experimentally rather than assumed**.
+
