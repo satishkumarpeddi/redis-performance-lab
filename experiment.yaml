@@ -1,0 +1,36 @@
+experiment:
+  id: "001"
+  name: "Single-node Redis baseline"
+  category: "baseline"
+
+environment:
+  node: "cluster-master"
+  os: "Ubuntu 26.04.1 LTS"
+  kernel: "7.0.0-31-generic"
+  cpu: "AMD A9-9425"
+  cpu_cores: 2
+  memory_gib: 6.16
+  redis_version: "8.0.5"
+
+redis:
+  role: "master"
+  replicas: 0
+  aof: false
+  maxmemory: "0"
+  eviction_policy: "noeviction"
+
+benchmark:
+  tool: "redis-benchmark"
+  tests:
+    - SET
+    - GET
+  requests: 100000
+
+results:
+  SET:
+    requests_per_second: 13224.02
+    p50_ms: 3.703
+
+  GET:
+    requests_per_second: 13022.53
+    p50_ms: 3.639
